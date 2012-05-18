@@ -1,0 +1,18 @@
+/* 
+  Localizable.strings
+  simpleVideo
+
+  Created by  on 12-4-9.
+  Copyright (c) 2012年 __MyCompanyName__. All rights reserved.
+*/
+
+"video state default string" = "welcome to video capture demo";
+"start cemera capture button title" = "Start";
+"stop cemera capture button title" = "Stop";
+
+"starting Video stream" = "Starting capture cemera stream";
+"already capturing" = "Already capturing...";
+"failed to get valide capture device" = "Failed to get valide capture device";
+"failed to get video input" = "Failed to get video input";
+"video capture started" = "Video capture started";
+"video capture stopped" = "Video capture stopped";

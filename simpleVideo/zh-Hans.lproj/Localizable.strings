@@ -1,0 +1,18 @@
+/* 
+  Localizable.strings
+  simpleVideo
+
+  Created by  on 12-4-9.
+  Copyright (c) 2012年 __MyCompanyName__. All rights reserved.
+*/
+
+"video state default string" = "欢迎进入视频采集Demo";
+"start cemera capture button title" = "开始";
+"stop cemera capture button title" = "停止";
+
+"starting Video stream" = "开始捕捉摄像头视频流";
+"already capturing" = "准备捕捉中...";
+"failed to get valide capture device" = "无法获得合法的视频捕捉设备";
+"failed to get video input" = "无法获取视频输入";
+"video capture started" = "视频捕捉中";
+"video capture stopped" = "视频捕捉停止";
