@@ -29,7 +29,8 @@
         
         // init variable
         _firstFrame = YES;
-        _producerFps = 15;
+        _producerFps = STREAM_FRAME_RATE;
+        dest = @"rtmp://192.168.1.233/flvplayback/star live=1 conn=S:sk";
     }
     return self;
 }
@@ -69,7 +70,7 @@
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation
 {
     // Return YES for supported orientations
-	return YES;
+	return interfaceOrientation == UIInterfaceOrientationPortrait;
 }
 
 // AVCaptureVideoDataOutputSampleBufferDelegate methods implemetation
@@ -194,11 +195,13 @@
     NSLog(@"origin image width: %d height: %d", width, height);    
     
     AVCodecContext *c = qvo->video_stream->codec;
-    avpicture_fill((AVPicture *)tmp_picture, buffer_base_address, PIX_FMT_RGB32, width, height);
+    avpicture_fill((AVPicture *)tmp_picture, buffer_base_address, src_pix_fmt, width, height);
     NSLog(@"raw picture to encode width: %d height: %d", c->width, c->height);
 
     // convert RGB32 to YUV420
     sws_scale(img_convert_ctx, tmp_picture->data, tmp_picture->linesize, 0, height, raw_picture->data, raw_picture->linesize);
+    
+   // avpicture_fill((AVPicture *)raw_picture, buffer_base_address, PIX_FMT_YUV420P, width, height);
     
     int out_size = write_video_frame(qvo, raw_picture);
    
@@ -298,9 +301,9 @@
     // the path to write file
     NSString *videoFile = [documentsDirectory stringByAppendingPathComponent:filename];
 
-    qvo->width = 352;
-    qvo->height = 288;
-    int ret = init_quick_video_output(qvo, [videoFile cString], "flv");
+    qvo->width = 192;
+    qvo->height = 144;
+    int ret = init_quick_video_output(qvo, [dest cString], "flv");
     if (ret < 0) {
         NSLog(@"quick video ouput initial failed");
         free(qvo);
@@ -308,7 +311,8 @@
         return;
     }
     enum PixelFormat pix_fmt = qvo->video_stream->codec->pix_fmt;
-    img_convert_ctx = sws_getContext(qvo->width, qvo->height, PIX_FMT_0BGR32, qvo->width, qvo->height, pix_fmt, SWS_BILINEAR, NULL, NULL, NULL);
+    src_pix_fmt = PIX_FMT_RGB32;
+    img_convert_ctx = sws_getContext(qvo->width, qvo->height, /*PIX_FMT_0BGR32*/ src_pix_fmt, qvo->width, qvo->height, pix_fmt, SWS_BILINEAR, NULL, NULL, NULL);
     
     raw_picture = alloc_picture(pix_fmt, qvo->width, qvo->height);
     tmp_picture = avcodec_alloc_frame();
@@ -345,11 +349,11 @@
         
         return;
     }
-    
+        
     // open camera and begin to capture
     // init avCaptureSession
     _avCaptureSession = [[AVCaptureSession alloc] init];
-    _avCaptureSession.sessionPreset = AVCaptureSessionPreset352x288;
+    _avCaptureSession.sessionPreset = AVCaptureSessionPresetLow;
     [_avCaptureSession addInput:_videoInput];
     
     /* Currently, the only supported key is kCVPixelBufferPixelFormatTypeKey. Recommended pixel 
@@ -361,17 +365,34 @@
     AVCaptureVideoDataOutput *_avCaptureVideoDataOutput = [[AVCaptureVideoDataOutput alloc] init];
     NSDictionary *_settings = [[NSDictionary alloc] initWithObjectsAndKeys:
                              [NSNumber numberWithUnsignedInt:kCVPixelFormatType_32BGRA], kCVPixelBufferPixelFormatTypeKey,
-                             [NSNumber numberWithInt:qvo->width], (id)kCVPixelBufferWidthKey,
-                             [NSNumber numberWithInt:qvo->height], (id)kCVPixelBufferHeightKey,
+                             [NSNumber numberWithInt:qvo->height], (id)kCVPixelBufferWidthKey,
+                             [NSNumber numberWithInt:qvo->width], (id)kCVPixelBufferHeightKey,
                              nil];
     _avCaptureVideoDataOutput.videoSettings = _settings;
-    _avCaptureVideoDataOutput.minFrameDuration = CMTimeMake(1, _producerFps);
     
     /*We create a serial queue to handle the processing of our frames*/
-    dispatch_queue_t queue = dispatch_queue_create("org.doubango.idoubs", NULL);
+    dispatch_queue_t queue = dispatch_queue_create("elegantcloud", NULL);
     [_avCaptureVideoDataOutput setSampleBufferDelegate:self queue:queue];
     [_avCaptureSession addOutput:_avCaptureVideoDataOutput];
     dispatch_release(queue);
+    
+    AVCaptureConnection *videoConnection = nil;
+    for (AVCaptureConnection *connection in _avCaptureVideoDataOutput.connections) {
+        for (AVCaptureInputPort *port in [connection inputPorts]) {
+            if ([[port mediaType] isEqual:AVMediaTypeVideo] ) {
+                videoConnection = connection;
+                break;
+            }
+        }
+        if (videoConnection) { break; }
+    }
+    if (videoConnection) {
+        videoConnection.videoMinFrameDuration = CMTimeMake(1, _producerFps);
+       // videoConnection.videoMaxFrameDuration = videoConnection.videoMinFrameDuration;
+        if (videoConnection.isVideoOrientationSupported) {
+           // videoConnection.videoOrientation = AVCaptureVideoOrientationPortrait;
+        }
+    }
     
     // create and init avCaptureVideoPreviewLayer
     AVCaptureVideoPreviewLayer* _previewLayer = [AVCaptureVideoPreviewLayer layerWithSession:_avCaptureSession];

@@ -40,6 +40,9 @@
     
     struct SwsContext *img_convert_ctx;
     double video_pts;
+    
+    NSString *dest;
+    enum PixelFormat src_pix_fmt;
 }
 
 // init UI control

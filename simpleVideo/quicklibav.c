@@ -60,6 +60,8 @@ static AVStream * create_video_stream(AVFormatContext *oc, enum CodecID codec_id
         return NULL;
     }
     
+    printf("new video stream time base: %d / %d\n", st->time_base.num, st->time_base.den);
+    
     c = st->codec;
     
     /**** set codec parameters ****/
@@ -84,7 +86,7 @@ static AVStream * create_video_stream(AVFormatContext *oc, enum CodecID codec_id
     
     c->level = 13; //Level 
     */
-     //c->profile = FF_PROFILE_H264_CONSTRAINED_BASELINE; //Baseline
+    c->profile = FF_PROFILE_H264_CONSTRAINED_BASELINE; //Baseline
     
     if (oc->oformat->flags & AVFMT_GLOBALHEADER) {
         c->flags |= CODEC_FLAG_GLOBAL_HEADER;
@@ -96,6 +98,7 @@ static AVStream * create_video_stream(AVFormatContext *oc, enum CodecID codec_id
         return NULL;
     }
     
+    
     return st;
 }
 
@@ -106,6 +109,8 @@ int init_quick_video_output(QuickVideoOutput *qvo, const char *filename, const c
     }
     
     av_register_all();
+   
+    avformat_network_init();
     
     AVOutputFormat *fmt = av_guess_format(type, filename, NULL);
     if (!fmt) {
@@ -120,11 +125,12 @@ int init_quick_video_output(QuickVideoOutput *qvo, const char *filename, const c
         return -1;
     }
     
+    fmt->video_codec = CODEC_ID_H264;
     oc->oformat = fmt;
     snprintf(oc->filename, sizeof(oc->filename), "%s", filename);
     qvo->video_output_context = oc;
     
-    AVStream *video_st = create_video_stream(oc, CODEC_ID_H264, qvo->width, qvo->height);
+    AVStream *video_st = create_video_stream(oc, fmt->video_codec, qvo->width, qvo->height);
     if (!video_st) {
         fprintf(stderr, "Could not add video stream\n");
         return -1;
@@ -134,7 +140,6 @@ int init_quick_video_output(QuickVideoOutput *qvo, const char *filename, const c
     /* init out buffer */
     video_outbuf_size = 100000 + 12 * video_st->codec->width * video_st->codec->height;
     video_outbuf = av_malloc(video_outbuf_size);
-    
     
     av_dump_format(oc, 0, filename, 1);
     
@@ -149,9 +154,11 @@ int init_quick_video_output(QuickVideoOutput *qvo, const char *filename, const c
         }
     }
     
+    
+    printf("video stream time base: %d / %d - codec time base: %d / %d\n",video_st->time_base.num, video_st->time_base.den, video_st->codec->time_base.num, video_st->codec->time_base.den);
+    
     /* write the stream header, if any */
     avformat_write_header(oc, NULL);
-    
     
     return ret;
 }
@@ -168,7 +175,9 @@ void close_quick_video_ouput(QuickVideoOutput *qvo) {
     if (oc) {
         av_write_trailer(oc);
     }
-        
+     
+    avformat_network_deinit();
+    
     if (st && st->codec) {
         avcodec_close(st->codec);
     }
@@ -230,6 +239,8 @@ int write_video_frame(QuickVideoOutput *qvo, AVFrame *raw_picture) {
         pkt.data = video_outbuf;
         pkt.size = out_size;
     
+        printf("pkt pts: %lld c->time_base: %d / %d vt->time_base: %d / %d\n", pkt.pts, c->time_base.num, c->time_base.den, qvo->video_stream->time_base.num, qvo->video_stream->time_base.den);
+        
         /* wite the compressed frame to the media file */
         ret = av_interleaved_write_frame(oc, &pkt);
     } else {
