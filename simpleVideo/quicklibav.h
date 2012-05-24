@@ -10,7 +10,7 @@
 #define testlibav_quicklibav_h
 #include "libavformat/avformat.h"
 
-#define STREAM_FRAME_RATE   10
+#define STREAM_FRAME_RATE   15
 #define STREAM_PIX_FMT      PIX_FMT_YUV420P
 
 typedef struct QuickVideoOutput {

@@ -66,7 +66,7 @@ static AVStream * create_video_stream(AVFormatContext *oc, enum CodecID codec_id
     
     /**** set codec parameters ****/
     /* put sample parameters */
-    c->bit_rate = 400000;
+    //c->bit_rate = 4000;
     /* resolution must be a multiple of two */
     c->width = width;
     c->height = height;
@@ -74,7 +74,8 @@ static AVStream * create_video_stream(AVFormatContext *oc, enum CodecID codec_id
     c->time_base = (AVRational){1, STREAM_FRAME_RATE};
     c->gop_size = 12; /* emit one intra frame every ten frames */
 
-    //c->max_b_frames=0;
+   // c->max_b_frames=0;
+   // c->b_frame_strategy = 0;
     
     c->pix_fmt = STREAM_PIX_FMT;
     /*
@@ -83,21 +84,25 @@ static AVStream * create_video_stream(AVFormatContext *oc, enum CodecID codec_id
     c->qmin = 10;
     c->qmax = 51;
     c->qcompress = 0.6; 
-    
-    c->level = 13; //Level 
     */
-    c->profile = FF_PROFILE_H264_CONSTRAINED_BASELINE; //Baseline
+    c->level = 10; //Level 
+    //c->profile = FF_PROFILE_H264_CONSTRAINED_BASELINE; //Baseline
     
     if (oc->oformat->flags & AVFMT_GLOBALHEADER) {
         c->flags |= CODEC_FLAG_GLOBAL_HEADER;
     }
     
+    AVDictionary *dict = NULL;
+    av_dict_set(&dict, "profile", "baseline", 0);
+    
     /* open video codec */
-    if (avcodec_open2(c, codec, NULL) < 0) {
+    if (avcodec_open2(c, codec, &dict) < 0) {
         fprintf(stderr, "Could not open codec\n");
+        av_dict_free(&dict);
         return NULL;
     }
     
+    av_dict_free(&dict);
     
     return st;
 }
@@ -239,7 +244,9 @@ int write_video_frame(QuickVideoOutput *qvo, AVFrame *raw_picture) {
         pkt.data = video_outbuf;
         pkt.size = out_size;
     
+        /*
         printf("pkt pts: %lld c->time_base: %d / %d vt->time_base: %d / %d\n", pkt.pts, c->time_base.num, c->time_base.den, qvo->video_stream->time_base.num, qvo->video_stream->time_base.den);
+        */
         
         /* wite the compressed frame to the media file */
         ret = av_interleaved_write_frame(oc, &pkt);

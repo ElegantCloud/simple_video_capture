@@ -8,11 +8,11 @@
          ignoreCount = "0"
          continueAfterRunningActions = "No"
          filePath = "simpleVideo/appViews/AVCaptureViewController.m"
-         timestampString = "359275539.496273"
+         timestampString = "359453767.91835"
          startingColumnNumber = "9223372036854775807"
          endingColumnNumber = "9223372036854775807"
-         startingLineNumber = "202"
-         endingLineNumber = "202"
+         startingLineNumber = "211"
+         endingLineNumber = "211"
          landmarkName = "-process_raw_frame:andWidth:andHeight:"
          landmarkType = "5">
       </FileBreakpoint>

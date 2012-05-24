@@ -30,7 +30,9 @@
         // init variable
         _firstFrame = YES;
         _producerFps = STREAM_FRAME_RATE;
-        dest = @"rtmp://192.168.1.233/flvplayback/star live=1 conn=S:sk";
+        //dest = @"rtmp://192.168.1.233/flvplayback/star live=1 conn=S:sk";
+        dest = @"rtmp://122.96.24.173/quick_server/iphone live=1 conn=S:sk_test";
+        //dest = @"rtp://192.168.1.233:10000";
     }
     return self;
 }
@@ -134,7 +136,7 @@
         
         
         /*Create a CGImageRef from the CVImageBufferRef*/
-        /*
+        
         CGColorSpaceRef _colorSpace = CGColorSpaceCreateDeviceRGB(); 
         if (_colorSpace == nil) {
             NSLog(@"CGColorSpaceCreateDeviceRGB failure");
@@ -147,7 +149,6 @@
         CGImageRef _newImage = CGBitmapContextCreateImage(_newContext); 
         
         CGContextRelease(_newContext); 
-        */
         
         // another to get image
         /*
@@ -161,25 +162,25 @@
          */
         
         /*We release some components*/
-        //CGColorSpaceRelease(_colorSpace);
+        CGColorSpaceRelease(_colorSpace);
         
         /* We display the result on the custom layer. All the display stuff must be done in the 
          * main thread because UIKit is no thread safe, and as we are not in the main thread 
          * (remember we didn't use the main_queue) we use performSelectorOnMainThread to call our 
          * CALayer and tell it to display the CGImage.
          */
-        //[_customLayer performSelectorOnMainThread:@selector(setContents:) withObject:(__bridge id)_newImage waitUntilDone:YES];
+       // [_customLayer performSelectorOnMainThread:@selector(setContents:) withObject:(__bridge id)_newImage waitUntilDone:YES];
 
         /* We display the result on the image view (We need to change the orientation of the image 
          * so that the video is displayed correctly). Same thing as for the CALayer we are not in 
          * the main thread so ...
          */
-        //UIImage *_image= [UIImage imageWithCGImage:_newImage scale:1.0 orientation:UIImageOrientationRight];
+        UIImage *_image= [UIImage imageWithCGImage:_newImage /*scale:1.0 orientation:nil*/];
     
         /*We relase the CGImageRef*/
-        //CGImageRelease(_newImage);
+        CGImageRelease(_newImage);
          
-        //[_mLocalVideoView performSelectorOnMainThread:@selector(setImage:) withObject:_image waitUntilDone:YES];
+        [_mLocalVideoView performSelectorOnMainThread:@selector(setImage:) withObject:_image waitUntilDone:YES];
         
         
         /*We unlock the  image buffer*/
@@ -191,21 +192,26 @@
 }
 
 -(void) process_raw_frame: (uint8_t *)buffer_base_address andWidth: (int)width andHeight: (int)height{
-    NSLog(@"process raw frame");
     NSLog(@"origin image width: %d height: %d", width, height);    
     
+    if (!qvo) {
+        return;
+    }
+    
+    
     AVCodecContext *c = qvo->video_stream->codec;
+    
     avpicture_fill((AVPicture *)tmp_picture, buffer_base_address, src_pix_fmt, width, height);
     NSLog(@"raw picture to encode width: %d height: %d", c->width, c->height);
+
+    img_convert_ctx = sws_getCachedContext(img_convert_ctx, width, height, src_pix_fmt, qvo->width, qvo->height, c->pix_fmt, SWS_BILINEAR, NULL, NULL, NULL);
 
     // convert RGB32 to YUV420
     sws_scale(img_convert_ctx, tmp_picture->data, tmp_picture->linesize, 0, height, raw_picture->data, raw_picture->linesize);
     
-   // avpicture_fill((AVPicture *)raw_picture, buffer_base_address, PIX_FMT_YUV420P, width, height);
-    
     int out_size = write_video_frame(qvo, raw_picture);
    
-    NSLog(@"stream pts val: %lld time base: %d / %d",qvo->video_stream->pts.val, qvo->video_stream->time_base.num, qvo->video_stream->time_base.den);
+   // NSLog(@"stream pts val: %lld time base: %d / %d",qvo->video_stream->pts.val, qvo->video_stream->time_base.num, qvo->video_stream->time_base.den);
     video_pts = (double)qvo->video_stream->pts.val * qvo->video_stream->time_base.num / qvo->video_stream->time_base.den;
     NSLog(@"write video frame - size: %d video pts: %f", out_size, video_pts);
     
@@ -240,7 +246,7 @@
     [self.view addSubview:_mVideoDisplayView];
     
     // local video display view
-    _mLocalVideoView = [[UIImageView alloc] initWithFrame:CGRectMake(_mVideoDisplayView.frame.origin.x+_mVideoDisplayView.frame.size.width-80.0-2.0, _mVideoDisplayView.frame.origin.y+_mVideoDisplayView.frame.size.height-106.7-2.0, 80.0, 106.7)];
+    _mLocalVideoView = [[UIImageView alloc] initWithFrame:CGRectMake(0 /*_mVideoDisplayView.frame.origin.x*/ /*+_mVideoDisplayView.frame.size.width-80.0-2.0*/, 0 /*_mVideoDisplayView.frame.origin.y*/ /*+_mVideoDisplayView.frame.size.height-106.7-2.0*/, 320, 428)];
     // set layer
     _mLocalVideoView.layer.cornerRadius = 4.0;
     _mLocalVideoView.layer.masksToBounds = YES;
@@ -280,7 +286,7 @@
     //NSLog(@"device cameras = %@", _cameras);
     
     for(AVCaptureDevice *_cemera in _cameras){
-        if (_cemera.position == AVCaptureDevicePositionFront){
+        if (_cemera.position == /*AVCaptureDevicePositionFront*/ AVCaptureDevicePositionBack){
             _ret = _cemera;
             
             break;
@@ -301,8 +307,8 @@
     // the path to write file
     NSString *videoFile = [documentsDirectory stringByAppendingPathComponent:filename];
 
-    qvo->width = 192;
-    qvo->height = 144;
+    qvo->width = /*192*/144;
+    qvo->height = /*144*/192;
     int ret = init_quick_video_output(qvo, [dest cString], "flv");
     if (ret < 0) {
         NSLog(@"quick video ouput initial failed");
@@ -310,11 +316,10 @@
         qvo = NULL;
         return;
     }
-    enum PixelFormat pix_fmt = qvo->video_stream->codec->pix_fmt;
+    enum PixelFormat dst_pix_fmt = qvo->video_stream->codec->pix_fmt;
     src_pix_fmt = PIX_FMT_RGB32;
-    img_convert_ctx = sws_getContext(qvo->width, qvo->height, /*PIX_FMT_0BGR32*/ src_pix_fmt, qvo->width, qvo->height, pix_fmt, SWS_BILINEAR, NULL, NULL, NULL);
     
-    raw_picture = alloc_picture(pix_fmt, qvo->width, qvo->height);
+    raw_picture = alloc_picture(dst_pix_fmt, qvo->width, qvo->height);
     tmp_picture = avcodec_alloc_frame();
     raw_picture->pts = 0;
     
@@ -363,11 +368,10 @@
      */
     // create and init avCaptureVideoDataOutput, and settings
     AVCaptureVideoDataOutput *_avCaptureVideoDataOutput = [[AVCaptureVideoDataOutput alloc] init];
+    [_avCaptureVideoDataOutput setAlwaysDiscardsLateVideoFrames:YES];
     NSDictionary *_settings = [[NSDictionary alloc] initWithObjectsAndKeys:
-                             [NSNumber numberWithUnsignedInt:kCVPixelFormatType_32BGRA], kCVPixelBufferPixelFormatTypeKey,
-                             [NSNumber numberWithInt:qvo->height], (id)kCVPixelBufferWidthKey,
-                             [NSNumber numberWithInt:qvo->width], (id)kCVPixelBufferHeightKey,
-                             nil];
+                               [NSNumber numberWithUnsignedInt:kCVPixelFormatType_32BGRA], kCVPixelBufferPixelFormatTypeKey, nil
+                               ];
     _avCaptureVideoDataOutput.videoSettings = _settings;
     
     /*We create a serial queue to handle the processing of our frames*/
@@ -390,17 +394,19 @@
         videoConnection.videoMinFrameDuration = CMTimeMake(1, _producerFps);
        // videoConnection.videoMaxFrameDuration = videoConnection.videoMinFrameDuration;
         if (videoConnection.isVideoOrientationSupported) {
-           // videoConnection.videoOrientation = AVCaptureVideoOrientationPortrait;
+            videoConnection.videoOrientation = AVCaptureVideoOrientationPortrait;
         }
     }
     
+    /*
     // create and init avCaptureVideoPreviewLayer
     AVCaptureVideoPreviewLayer* _previewLayer = [AVCaptureVideoPreviewLayer layerWithSession:_avCaptureSession];
     // set frame
     _previewLayer.frame = _mVideoDisplayView.bounds;
     _previewLayer.videoGravity= AVLayerVideoGravityResizeAspectFill;
     [_mVideoDisplayView.layer addSublayer: _previewLayer];
-    
+    */
+     
     _firstFrame= YES;
     [_avCaptureSession startRunning];
     
